@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Android Fortune</string>
+    <string name="fortune_content">Your fortune goes here</string>
+</resources>
