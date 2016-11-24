@@ -1,39 +1,23 @@
 package com.minktek.andfortune;
 
-import java.io.IOException;
-import java.io.InputStream;
-
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.os.AsyncTask;
-import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.widget.TextView;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.EditText;
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
-import android.content.SharedPreferences;
+import android.widget.TextView;
+import android.widget.Toast;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.protocol.BasicHttpContext;
-import org.apache.http.protocol.HttpContext;
-
-import org.json.JSONObject;
-
-public class MainActivity extends Activity implements OnClickListener
+public class MainActivity extends Activity 
+                          implements OnClickListener, InterfaceMessage
 {
     final String HOSTID = "HostIdentifier";
-    final String JSON_KEYNAME = "fortune";
+    final String FAILED_HOSTNAME = "0.0.0.0";
 
-    /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState)
     {
@@ -47,22 +31,15 @@ public class MainActivity extends Activity implements OnClickListener
     public void onResume() 
     {
         super.onResume();  
-        EditText et = (EditText) findViewById(R.id.hostname_content);
 
         SharedPreferences sharedPref = getPreferences(MODE_PRIVATE);
-        String host = sharedPref.getString(HOSTID, HOSTID);
-        if (host == HOSTID)
-        {
-            updateHostname(et);
-        }
-        else 
-        {
-            et.setText(host);
-        }
+        String host = validateHostname(sharedPref.getString(HOSTID, HOSTID));
+
+        EditText et = (EditText) findViewById(R.id.hostname_content);
+        et.setText(host);
 
         // anytime we get restored, get a new fortune
-        buttonEnable(false);
-        new LongRunningGetIO().execute();
+        runIt();
     }
 
     @Override
@@ -78,21 +55,66 @@ public class MainActivity extends Activity implements OnClickListener
     @Override
     public void onClick(View arg0)
     {
-        buttonEnable(false);
-        new LongRunningGetIO().execute();
+        runIt();
     }
 
-    protected void updateHostname(EditText et)
+    @Override
+    public String SendMessage(String message)
+    {
+        final String msg = message;
+        runOnUiThread(new Runnable() 
+            {
+                @Override
+                public void run() 
+                {
+                    if (msg != null) 
+                    {
+                        TextView tv = (TextView) findViewById(R.id.fortune_content);
+                        tv.setText(msg);
+                    }
+                    buttonEnable(true);
+                }
+            }
+        );
+        
+        return msg;
+    }
+
+    protected void runIt()
+    {
+        buttonEnable(false);
+
+        String hostname = getHostname();
+        if (hostname == FAILED_HOSTNAME)
+        {
+            Toast.makeText(this, "Invalid Host", Toast.LENGTH_LONG).show();
+        }
+        else
+        {
+            LongRunningGetIO lrgio = new LongRunningGetIO();
+            lrgio.setAddress(getHostname(), getPortnum());
+            lrgio.execute(this);
+        }
+    }
+
+    protected String validateHostname(String host)
     {
         final String format = "%d.%d.%d.%d";
 
-        WifiManager wifiManager = (WifiManager) getSystemService(WIFI_SERVICE);
-        WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-        int ip = wifiInfo.getIpAddress();
+        if (host == HOSTID)
+        {
+            WifiManager wm = (WifiManager) getSystemService(WIFI_SERVICE);
+            WifiInfo wifiInfo = wm.getConnectionInfo();
+            int ip = wifiInfo.getIpAddress();
 
-        String ipString = String.format(format, (ip & 0xff), (ip >> 8 & 0xff), 
-                                        (ip >> 16 & 0xff), (ip >> 24 & 0xff));        
-        et.setText(ipString);
+            return String.format(format, (ip & 0xff), (ip >> 8 & 0xff), 
+                                (ip >> 16 & 0xff), (ip >> 24 & 0xff));        
+        }
+
+        /* XXX do IPv4 checks - dots, numbers, etc. */
+        /*     if we fail validation, return "failed" hostname */
+
+        return host;
     }
 
     protected String getHostname()
@@ -121,55 +143,5 @@ public class MainActivity extends Activity implements OnClickListener
         b.setClickable(which);
     }
 
-    private class LongRunningGetIO extends AsyncTask <Void, Void, String>
-    {
-        protected String getContentFromEntity(HttpEntity entity) throws IllegalStateException, IOException 
-        {
-            InputStream in = entity.getContent();
-            StringBuffer out = new StringBuffer();
-            while (true) 
-            {
-                byte[] b = new byte[4096];
-                int n = in.read(b);
-                if (n <= 0)
-                    break;
-                out.append(new String(b, 0, n));
-            }
-
-            return out.toString();
-        }
-
-        @Override
-        protected String doInBackground(Void... params) 
-        {
-            String url = "http://" + getHostname() + ":" + getPortnum() + "/fortune";
-            String text = null;
-            try 
-            {
-                HttpClient httpClient = new DefaultHttpClient();
-                HttpContext localContext = new BasicHttpContext();
-                HttpGet httpGet = new HttpGet(url);
-                HttpResponse response = httpClient.execute(httpGet, localContext); 
-                HttpEntity entity = response.getEntity(); 
-                JSONObject jsonResponse = new JSONObject(getContentFromEntity(entity));
-                text = jsonResponse.getString(JSON_KEYNAME);
-            } 
-            catch (Exception e) 
-            {
-                text = e.getLocalizedMessage();
-            }
-            return text;
-        }
-
-        protected void onPostExecute(String results) 
-        {
-            if (results != null) 
-            {
-                TextView tv = (TextView) findViewById(R.id.fortune_content);
-                tv.setText(results);
-            }
-            buttonEnable(true);
-        }
-    } // class "LongRunningGetIO"
-} // class "Main"
+} 
 
