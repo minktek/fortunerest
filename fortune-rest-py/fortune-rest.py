@@ -50,7 +50,7 @@ def device_list():
         literal = 'error'
         f = 'application not found'
 
-    time.sleep(5) # for testing different conditions
+    # time.sleep(5) # simulating different test conditions
     return jsonify({literal: f})
 
 @app.errorhandler(HTTP_STATUS_NOT_FOUND)
