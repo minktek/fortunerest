@@ -15,18 +15,13 @@ import org.apache.http.protocol.HttpContext;
 
 import org.json.JSONObject;
 
-class LongRunningGetIO extends AsyncTask <InterfaceMessage, Void, String>
+class LongRunningGetIO extends AsyncTask <String, Void, String>
 {
-    protected final String JSON_KEYNAME = "fortune";
-    protected final String PROTOCOL = "http://";
+    protected InterfaceMessage jsonHandler;
 
-    protected String hostname;
-    protected String portnum;
-
-    public void setAddress(String host, String port)
+    public void setHandler(InterfaceMessage handler)
     {
-        hostname = host;
-        portnum = port;
+        jsonHandler = handler;
     }
 
     protected String getContentFromEntity(HttpEntity entity) throws 
@@ -47,13 +42,19 @@ class LongRunningGetIO extends AsyncTask <InterfaceMessage, Void, String>
     }
 
     @Override
-    protected String doInBackground(InterfaceMessage... msgs) 
+    protected String doInBackground(String... urls) 
     {
-        // int count = msgs.length; XXX do I care?
-        InterfaceMessage msg = msgs[0];
+        if (jsonHandler == null)
+        {
+            // XXX log a message - error
+            return null;
+        }
 
-        String url = PROTOCOL + hostname + ":" + portnum + "/" + JSON_KEYNAME;
+        // int count = urls.length; XXX do I care?
+        String url = urls[0];
+
         String text = null;
+        JSONObject jresp = null;
         try 
         {
             HttpClient httpClient = new DefaultHttpClient();
@@ -61,15 +62,14 @@ class LongRunningGetIO extends AsyncTask <InterfaceMessage, Void, String>
             HttpGet httpGet = new HttpGet(url);
             HttpResponse response = httpClient.execute(httpGet, hctx); 
             HttpEntity entity = response.getEntity(); 
-            JSONObject jresp = new JSONObject(getContentFromEntity(entity));
-            text = jresp.getString(JSON_KEYNAME);
+            jresp = new JSONObject(getContentFromEntity(entity));
         } 
         catch (Exception e) 
         {
             text = e.getLocalizedMessage();
         }
 
-        return msg.SendMessage(text);
+        return jsonHandler.SendMessage(jresp, text);
     }
 } 
 

@@ -12,11 +12,15 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONObject;
+
 public class MainActivity extends Activity 
                           implements OnClickListener, InterfaceMessage
 {
-    final String HOSTID = "HostIdentifier";
-    final String FAILED_HOSTNAME = "0.0.0.0";
+    protected final String HOSTID = "HostIdentifier";
+    protected final String FAILED_HOSTNAME = "0.0.0.0";
+    protected final String PROTOCOL = "http://";
+    public final String JSON_KEYNAME = "fortune";
 
     @Override
     public void onCreate(Bundle savedInstanceState)
@@ -38,7 +42,7 @@ public class MainActivity extends Activity
         EditText et = (EditText) findViewById(R.id.hostname_content);
         et.setText(host);
 
-        // anytime we get restored, get a new fortune
+        // anytime we get restored, get make a new request
         runIt();
     }
 
@@ -59,18 +63,34 @@ public class MainActivity extends Activity
     }
 
     @Override
-    public String SendMessage(String message)
+    public String SendMessage(JSONObject jobj, String message)
     {
         final String msg = message;
+        final JSONObject jresp = jobj;
         runOnUiThread(new Runnable() 
             {
                 @Override
                 public void run() 
                 {
-                    if (msg != null) 
+                    TextView tv = (TextView) findViewById(R.id.fortune_content);
+                    if (jresp != null)
                     {
-                        TextView tv = (TextView) findViewById(R.id.fortune_content);
+                        try
+                        {
+                            tv.setText(jresp.getString(JSON_KEYNAME));
+                        }
+                        catch (Exception e)
+                        {
+                            tv.setText(e.getLocalizedMessage());
+                        }
+                    }
+                    else if (msg != null) 
+                    {
                         tv.setText(msg);
+                    }
+                    else
+                    {
+                        tv.setText("Internal Error: Something really unexpected happened");
                     }
                     buttonEnable(true);
                 }
@@ -92,8 +112,8 @@ public class MainActivity extends Activity
         else
         {
             LongRunningGetIO lrgio = new LongRunningGetIO();
-            lrgio.setAddress(getHostname(), getPortnum());
-            lrgio.execute(this);
+            lrgio.setHandler(this);
+            lrgio.execute(PROTOCOL + getHostname() + ":" + getPortnum() + "/" + JSON_KEYNAME);
         }
     }
 
