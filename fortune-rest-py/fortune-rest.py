@@ -65,5 +65,9 @@ if __name__ == '__main__':
     parser.add_argument("-p", "--port", type=int, default=5100, action='store',
                         dest='portnum', help="port number server listens on")
     args = parser.parse_args()
-    app.run(debug=True, host=args.bindaddr, port=int(args.portnum))
+
+    try:
+        app.run(debug=True, host=args.bindaddr, port=int(args.portnum))
+    except OSError:
+        print("Unable to start application - is there an instance already running?")
 
